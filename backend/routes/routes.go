@@ -19,7 +19,6 @@ func SetupRouter() *gin.Engine {
 	}))
 
 	r.GET("/api/seed", controllers.SeedData)
-	r.GET("/api/trips", controllers.GetTrips)
 	r.GET("/api/users", controllers.GetUsers)
 
 	api := r.Group("/api")
@@ -38,6 +37,22 @@ func SetupRouter() *gin.Engine {
 			refunds.GET("/:id", controllers.GetRefundRequest)
 			refunds.POST("", controllers.CreateRefundRequest)
 			refunds.POST("/:id/review", controllers.ReviewRefundRequest)
+			refunds.POST("/batch-review", controllers.BatchReviewRefundRequests)
+		}
+
+		trips := api.Group("/trips")
+		{
+			trips.GET("", controllers.GetTrips)
+			trips.GET("/:id", controllers.GetTrip)
+			trips.POST("", controllers.CreateTrip)
+			trips.PUT("/:id", controllers.UpdateTrip)
+			trips.DELETE("/:id", controllers.DeleteTrip)
+			trips.POST("/:id/adjust-spots", controllers.AdjustTripSpots)
+			trips.GET("/:id/itineraries", controllers.GetTripItineraries)
+			trips.POST("/:id/itineraries", controllers.CreateItinerary)
+			trips.PUT("/:id/itineraries/:itinerary_id", controllers.UpdateItinerary)
+			trips.DELETE("/:id/itineraries/:itinerary_id", controllers.DeleteItinerary)
+			trips.GET("/:id/spot-logs", controllers.GetSpotLogs)
 		}
 	}
 

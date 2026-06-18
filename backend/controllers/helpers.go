@@ -18,3 +18,17 @@ func generateRefundNo() string {
 func timeNow() time.Time {
 	return time.Now()
 }
+
+func parseDate(dateStr string) (time.Time, error) {
+	formats := []string{
+		"2006-01-02",
+		"2006-01-02 15:04:05",
+		time.RFC3339,
+	}
+	for _, format := range formats {
+		if t, err := time.ParseInLocation(format, dateStr, time.Local); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date format")
+}

@@ -2,7 +2,7 @@
   <div class="page-container">
     <div class="page-header">
       <h2>退款管理</h2>
-      <p>管理所有退款申请，支持审核、查看详情等操作</p>
+      <p>管理所有退款申请，支持审核、批量审核、查看详情等操作</p>
     </div>
 
     <div class="card-content">
@@ -18,18 +18,48 @@
             <span>查询</span>
           </el-button>
         </div>
-        <el-button type="success" @click="loadRefunds">
-          <el-icon><Refresh /></el-icon>
-          <span>刷新</span>
-        </el-button>
+        <div>
+          <el-button type="success" @click="loadRefunds">
+            <el-icon><Refresh /></el-icon>
+            <span>刷新</span>
+          </el-button>
+          <el-button
+            type="warning"
+            @click="openBatchReview('approved')"
+            :disabled="selectedRefunds.length === 0"
+          >
+            <el-icon><CircleCheck /></el-icon>
+            <span>批量通过 ({{ selectedRefunds.length }})</span>
+          </el-button>
+          <el-button
+            type="danger"
+            @click="openBatchReview('rejected')"
+            :disabled="selectedRefunds.length === 0"
+          >
+            <el-icon><CircleClose /></el-icon>
+            <span>批量拒绝 ({{ selectedRefunds.length }})</span>
+          </el-button>
+        </div>
       </div>
 
-      <el-table :data="refunds" style="width: 100%" v-loading="loading" stripe>
+      <el-table
+        :data="refunds"
+        style="width: 100%"
+        v-loading="loading"
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="refund_no" label="退款编号" width="200" />
         <el-table-column prop="order_no" label="关联订单" width="200" />
         <el-table-column label="行程名称" min-width="160">
           <template #default="{ row }">
             {{ row.order?.trip_name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="退还人数" width="90" align="center">
+          <template #default="{ row }">
+            {{ row.order?.travelers || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="退款金额" width="120">
@@ -96,7 +126,11 @@
         <el-descriptions-item label="退款金额">
           <span style="color: #409EFF; font-weight: 600;">¥{{ currentRefund.refund_amount?.toFixed(2) }}</span>
         </el-descriptions-item>
+        <el-descriptions-item label="退还人数">{{ currentRefund.order?.travelers || '-' }} 人</el-descriptions-item>
         <el-descriptions-item label="退款原因">{{ reasonText(currentRefund.reason) }}</el-descriptions-item>
+        <el-descriptions-item label="余位归还" v-if="currentRefund.status === 'approved'">
+          <el-tag type="success" effect="light">已归还 {{ currentRefund.order?.travelers || '-' }} 个余位</el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="详细说明" :span="2">
           <span style="white-space: pre-wrap;">{{ currentRefund.description || '-' }}</span>
         </el-descriptions-item>
@@ -113,17 +147,24 @@
 
     <el-dialog v-model="reviewVisible" :title="reviewTitle" width="500px">
       <el-alert
-        :title="reviewType === 'approved' ? '通过后将按退款金额退款至用户账户' : '拒绝后订单将恢复为已支付状态'"
+        :title="reviewAlertTitle"
         :type="reviewType === 'approved' ? 'success' : 'warning'"
         :closable="false"
         style="margin-bottom: 20px;"
-      />
+      >
+        <p v-if="reviewType === 'approved'">• 审核通过后，将按退款金额退款至用户账户</p>
+        <p v-if="reviewType === 'approved'">• 该订单的 {{ currentReviewRefund?.order?.travelers || '-' }} 个余位将自动归还至行程</p>
+        <p v-if="reviewType === 'rejected'">• 拒绝后订单将恢复为已支付状态，余位不归还</p>
+      </el-alert>
       <el-form :model="reviewForm" label-width="100px">
         <el-form-item label="退款编号">
           <span>{{ currentReviewRefund?.refund_no }}</span>
         </el-form-item>
         <el-form-item label="退款金额">
           <span style="color: #409EFF; font-weight: 600;">¥{{ currentReviewRefund?.refund_amount?.toFixed(2) }}</span>
+        </el-form-item>
+        <el-form-item v-if="reviewType === 'approved'" label="退还余位">
+          <el-tag type="success" effect="light">+{{ currentReviewRefund?.order?.travelers || 0 }} 位</el-tag>
         </el-form-item>
         <el-form-item label="审核备注">
           <el-input
@@ -145,17 +186,59 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="batchReviewVisible" :title="batchReviewTitle" width="500px">
+      <el-alert
+        :title="batchReviewAlertTitle"
+        :type="batchReviewType === 'approved' ? 'success' : 'warning'"
+        :closable="false"
+        style="margin-bottom: 20px;"
+      >
+        <p v-if="batchReviewType === 'approved'">• 将批量通过 {{ selectedRefunds.length }} 条退款申请</p>
+        <p v-if="batchReviewType === 'approved'">• 所有关联订单的余位将自动归还至对应行程</p>
+        <p v-if="batchReviewType === 'rejected'">• 将批量拒绝 {{ selectedRefunds.length }} 条退款申请</p>
+        <p v-if="batchReviewType === 'rejected'">• 所有关联订单将恢复为已支付状态</p>
+      </el-alert>
+      <div style="margin-bottom: 16px;">
+        <p><strong>待处理数量：</strong>{{ selectedRefunds.length }} 条</p>
+        <p v-if="batchReviewType === 'approved'">
+          <strong>预计归还余位：</strong>
+          <el-tag type="success" effect="light">+{{ totalReturnSpots }} 位</el-tag>
+        </p>
+      </div>
+      <el-form :model="reviewForm" label-width="100px">
+        <el-form-item label="统一审核备注">
+          <el-input
+            v-model="reviewForm.remark"
+            type="textarea"
+            :rows="3"
+            :placeholder="batchReviewType === 'approved' ? '请输入统一备注（选填）' : '请输入统一拒绝原因（选填）'"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchReviewVisible = false">取消</el-button>
+        <el-button
+          :type="batchReviewType === 'approved' ? 'success' : 'danger'"
+          @click="submitBatchReview"
+          :loading="submitting"
+        >
+          确认{{ batchReviewType === 'approved' ? '批量通过' : '批量拒绝' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getRefundRequests, getRefundRequest, reviewRefundRequest } from '@/api/refund'
+import { getRefundRequests, getRefundRequest, reviewRefundRequest, batchReviewRefundRequests } from '@/api/refund'
 
 const loading = ref(false)
 const refunds = ref([])
 const filterStatus = ref('')
+const selectedRefunds = ref([])
 
 const detailVisible = ref(false)
 const currentRefund = ref(null)
@@ -168,8 +251,27 @@ const reviewForm = reactive({
   remark: ''
 })
 
+const batchReviewVisible = ref(false)
+const batchReviewType = ref('')
+
 const reviewTitle = computed(() => {
   return reviewType.value === 'approved' ? '审核通过' : '审核拒绝'
+})
+
+const reviewAlertTitle = computed(() => {
+  return reviewType.value === 'approved' ? '通过后将按退款金额退款至用户账户并归还余位' : '拒绝后订单将恢复为已支付状态'
+})
+
+const batchReviewTitle = computed(() => {
+  return batchReviewType.value === 'approved' ? '批量审核通过' : '批量审核拒绝'
+})
+
+const batchReviewAlertTitle = computed(() => {
+  return batchReviewType.value === 'approved' ? '批量通过后将自动退款并归还所有余位' : '批量拒绝后所有订单将恢复为已支付状态'
+})
+
+const totalReturnSpots = computed(() => {
+  return selectedRefunds.value.reduce((sum, item) => sum + (item.order?.travelers || 0), 0)
 })
 
 async function loadRefunds() {
@@ -182,6 +284,10 @@ async function loadRefunds() {
   } finally {
     loading.value = false
   }
+}
+
+function handleSelectionChange(selection) {
+  selectedRefunds.value = selection.filter(item => item.status === 'pending')
 }
 
 function statusText(status) {
@@ -235,6 +341,16 @@ function openReviewDialog(row, type) {
   reviewVisible.value = true
 }
 
+function openBatchReview(type) {
+  if (selectedRefunds.value.length === 0) {
+    ElMessage.warning('请先选择待审核的退款申请')
+    return
+  }
+  batchReviewType.value = type
+  reviewForm.remark = ''
+  batchReviewVisible.value = true
+}
+
 async function submitReview() {
   ElMessageBox.confirm(
     `确认${reviewType.value === 'approved' ? '通过' : '拒绝'}该退款申请？`,
@@ -251,8 +367,42 @@ async function submitReview() {
         status: reviewType.value,
         review_remark: reviewForm.remark
       })
-      ElMessage.success(reviewType.value === 'approved' ? '审核通过，已完成退款' : '已拒绝该申请')
+      ElMessage.success(
+        reviewType.value === 'approved'
+          ? '审核通过，已完成退款并归还余位'
+          : '已拒绝该申请'
+      )
       reviewVisible.value = false
+      loadRefunds()
+    } finally {
+      submitting.value = false
+    }
+  }).catch(() => {})
+}
+
+async function submitBatchReview() {
+  const ids = selectedRefunds.value.map(item => item.id)
+  ElMessageBox.confirm(
+    `确认${batchReviewType.value === 'approved' ? '批量通过' : '批量拒绝'} ${ids.length} 条退款申请？`,
+    '批量审核确认',
+    {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: batchReviewType.value === 'approved' ? 'success' : 'warning'
+    }
+  ).then(async () => {
+    submitting.value = true
+    try {
+      const res = await batchReviewRefundRequests({
+        ids,
+        status: batchReviewType.value,
+        review_remark: reviewForm.remark
+      })
+      ElMessage.success(
+        `批量审核完成！成功处理 ${res.data.success_count}/${res.data.total_count} 条`
+      )
+      batchReviewVisible.value = false
+      selectedRefunds.value = []
       loadRefunds()
     } finally {
       submitting.value = false

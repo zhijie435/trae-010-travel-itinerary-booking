@@ -22,6 +22,8 @@ func InitDB() {
 		&models.Trip{},
 		&models.Order{},
 		&models.RefundRequest{},
+		&models.TripItinerary{},
+		&models.SpotAdjustmentLog{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)

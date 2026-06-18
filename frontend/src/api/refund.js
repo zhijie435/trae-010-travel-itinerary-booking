@@ -30,3 +30,11 @@ export function reviewRefundRequest(id, data) {
     data
   })
 }
+
+export function batchReviewRefundRequests(data) {
+  return request({
+    url: '/refunds/batch-review',
+    method: 'post',
+    data
+  })
+}
