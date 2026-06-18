@@ -18,42 +18,69 @@ func SetupRouter() *gin.Engine {
 		AllowCredentials: true,
 	}))
 
-	r.GET("/api/seed", controllers.SeedData)
-	r.GET("/api/users", controllers.GetUsers)
+	seedCtrl := controllers.NewSeedController()
+	userCtrl := controllers.NewUserController()
+
+	r.GET("/api/seed", seedCtrl.SeedData)
+	r.GET("/api/users", userCtrl.GetUsers)
 
 	api := r.Group("/api")
 	{
+		orderCtrl := controllers.NewOrderController()
 		orders := api.Group("/orders")
 		{
-			orders.GET("", controllers.GetOrders)
-			orders.GET("/:id", controllers.GetOrder)
-			orders.POST("", controllers.CreateOrder)
-			orders.POST("/:id/pay", controllers.PayOrder)
+			orders.GET("", orderCtrl.GetOrders)
+			orders.GET("/:id", orderCtrl.GetOrder)
+			orders.POST("", orderCtrl.CreateOrder)
+			orders.POST("/:id/pay", orderCtrl.PayOrder)
 		}
 
 		refunds := api.Group("/refunds")
 		{
-			refunds.GET("", controllers.GetRefundRequests)
-			refunds.GET("/:id", controllers.GetRefundRequest)
-			refunds.GET("/:id/review-logs", controllers.GetRefundReviewLogs)
-			refunds.POST("", controllers.CreateRefundRequest)
-			refunds.POST("/:id/review", controllers.ReviewRefundRequest)
-			refunds.POST("/batch-review", controllers.BatchReviewRefundRequests)
+			refunds.GET("", orderCtrl.GetRefundRequests)
+			refunds.GET("/:id", orderCtrl.GetRefundRequest)
+			refunds.GET("/:id/review-logs", orderCtrl.GetRefundReviewLogs)
+			refunds.POST("", orderCtrl.CreateRefundRequest)
+			refunds.POST("/:id/review", orderCtrl.ReviewRefundRequest)
+			refunds.POST("/batch-review", orderCtrl.BatchReviewRefundRequests)
+		}
+
+		routeCtrl := controllers.NewRouteController()
+		routes := api.Group("/routes")
+		{
+			routes.GET("", routeCtrl.GetRoutes)
+			routes.GET("/:id", routeCtrl.GetRoute)
+			routes.POST("", routeCtrl.CreateRoute)
+			routes.PUT("/:id", routeCtrl.UpdateRoute)
+			routes.DELETE("/:id", routeCtrl.DeleteRoute)
+			routes.GET("/:id/itineraries", routeCtrl.GetItineraries)
+			routes.POST("/:id/itineraries", routeCtrl.CreateItinerary)
+			routes.PUT("/:id/itineraries/:itinerary_id", routeCtrl.UpdateItinerary)
+			routes.DELETE("/:id/itineraries/:itinerary_id", routeCtrl.DeleteItinerary)
+		}
+
+		inventoryCtrl := controllers.NewInventoryController()
+		inventories := api.Group("/inventories")
+		{
+			inventories.GET("/route/:id", inventoryCtrl.GetInventories)
+			inventories.GET("/:id", inventoryCtrl.GetInventory)
+			inventories.POST("/:id/adjust", inventoryCtrl.AdjustSpots)
+			inventories.GET("/route/:id/logs", inventoryCtrl.GetAdjustLogs)
 		}
 
 		trips := api.Group("/trips")
 		{
-			trips.GET("", controllers.GetTrips)
-			trips.GET("/:id", controllers.GetTrip)
-			trips.POST("", controllers.CreateTrip)
-			trips.PUT("/:id", controllers.UpdateTrip)
-			trips.DELETE("/:id", controllers.DeleteTrip)
-			trips.POST("/:id/adjust-spots", controllers.AdjustTripSpots)
-			trips.GET("/:id/itineraries", controllers.GetTripItineraries)
-			trips.POST("/:id/itineraries", controllers.CreateItinerary)
-			trips.PUT("/:id/itineraries/:itinerary_id", controllers.UpdateItinerary)
-			trips.DELETE("/:id/itineraries/:itinerary_id", controllers.DeleteItinerary)
-			trips.GET("/:id/spot-logs", controllers.GetSpotLogs)
+			trips.GET("", routeCtrl.GetRoutes)
+			trips.GET("/:id", routeCtrl.GetRoute)
+			trips.POST("", routeCtrl.CreateRoute)
+			trips.PUT("/:id", routeCtrl.UpdateRoute)
+			trips.DELETE("/:id", routeCtrl.DeleteRoute)
+			trips.POST("/:id/adjust-spots", inventoryCtrl.AdjustSpots)
+			trips.GET("/:id/itineraries", routeCtrl.GetItineraries)
+			trips.POST("/:id/itineraries", routeCtrl.CreateItinerary)
+			trips.PUT("/:id/itineraries/:itinerary_id", routeCtrl.UpdateItinerary)
+			trips.DELETE("/:id/itineraries/:itinerary_id", routeCtrl.DeleteItinerary)
+			trips.GET("/:id/spot-logs", inventoryCtrl.GetAdjustLogs)
 		}
 	}
 
