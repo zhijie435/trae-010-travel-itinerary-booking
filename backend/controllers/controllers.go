@@ -500,13 +500,12 @@ func GetTrips(c *gin.Context) {
 
 	if startDate != "" {
 		if t, err := parseDate(startDate); err == nil {
-			query = query.Where("end_date >= ?", t)
+			query = query.Where("DATE(end_date) >= DATE(?)", t.Format("2006-01-02"))
 		}
 	}
 	if endDate != "" {
 		if t, err := parseDate(endDate); err == nil {
-			endOfDay := t.Add(24*time.Hour - time.Second)
-			query = query.Where("start_date <= ?", endOfDay)
+			query = query.Where("DATE(start_date) <= DATE(?)", t.Format("2006-01-02"))
 		}
 	}
 
