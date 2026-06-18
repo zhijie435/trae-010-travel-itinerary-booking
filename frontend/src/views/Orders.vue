@@ -61,25 +61,64 @@
       <el-empty v-if="!loading && orders.length === 0" description="暂无订单数据" />
     </div>
 
-    <el-dialog v-model="detailVisible" title="订单详情" width="600px">
-      <el-descriptions :column="2" border v-if="currentOrder">
-        <el-descriptions-item label="订单编号">{{ currentOrder.order_no }}</el-descriptions-item>
-        <el-descriptions-item label="订单状态">
-          <el-tag :type="statusType(currentOrder.status)" effect="light">{{ statusText(currentOrder.status) }}</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="行程名称" :span="2">{{ currentOrder.trip_name }}</el-descriptions-item>
-        <el-descriptions-item label="出发日期">{{ currentOrder.trip ? formatDate(currentOrder.trip.start_date) : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="返程日期">{{ currentOrder.trip ? formatDate(currentOrder.trip.end_date) : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="出行人数">{{ currentOrder.travelers }} 人</el-descriptions-item>
-        <el-descriptions-item label="单价">¥{{ currentOrder.trip_price?.toFixed(2) }}</el-descriptions-item>
-        <el-descriptions-item label="订单金额">
-          <span style="color: #f56c6c; font-weight: 600;">¥{{ currentOrder.total_amount?.toFixed(2) }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="联系人">{{ currentOrder.contact_name }}</el-descriptions-item>
-        <el-descriptions-item label="联系电话">{{ currentOrder.contact_phone }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间" :span="2">{{ formatDate(currentOrder.created_at) }}</el-descriptions-item>
-        <el-descriptions-item label="支付时间" :span="2">{{ currentOrder.pay_time ? formatDate(currentOrder.pay_time) : '未支付' }}</el-descriptions-item>
-      </el-descriptions>
+    <el-dialog v-model="detailVisible" title="订单详情" width="720px" class="order-detail-dialog">
+      <el-tabs v-model="detailTab" v-if="currentOrder">
+        <el-tab-pane label="基本信息" name="basic">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="订单编号">{{ currentOrder.order_no }}</el-descriptions-item>
+            <el-descriptions-item label="订单状态">
+              <el-tag :type="statusType(currentOrder.status)" effect="light">{{ statusText(currentOrder.status) }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="行程名称" :span="2">{{ currentOrder.trip_name }}</el-descriptions-item>
+            <el-descriptions-item label="出发日期">{{ currentOrder.trip ? formatDate(currentOrder.trip.start_date) : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="返程日期">{{ currentOrder.trip ? formatDate(currentOrder.trip.end_date) : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="出行人数">{{ currentOrder.travelers }} 人</el-descriptions-item>
+            <el-descriptions-item label="单价">¥{{ currentOrder.trip_price?.toFixed(2) }}</el-descriptions-item>
+            <el-descriptions-item label="订单金额">
+              <span style="color: #f56c6c; font-weight: 600;">¥{{ currentOrder.total_amount?.toFixed(2) }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="联系人">{{ currentOrder.contact_name }}</el-descriptions-item>
+            <el-descriptions-item label="联系电话">{{ currentOrder.contact_phone }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间" :span="2">{{ formatDate(currentOrder.created_at) }}</el-descriptions-item>
+            <el-descriptions-item label="支付时间" :span="2">{{ currentOrder.pay_time ? formatDate(currentOrder.pay_time) : '未支付' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+        <el-tab-pane label="每日行程安排" name="itinerary">
+          <div v-if="itineraries && itineraries.length" style="max-height: 480px; overflow-y: auto; padding-right: 8px;">
+            <el-timeline>
+              <el-timeline-item
+                v-for="item in itineraries"
+                :key="item.id"
+                :timestamp="`第 ${item.day_number} 天`"
+                placement="top"
+                :type="getDayType(item.day_number)"
+              >
+                <el-card shadow="hover" class="itinerary-card">
+                  <template #header>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span style="font-weight: 600; font-size: 15px;">{{ item.title }}</span>
+                    </div>
+                  </template>
+                  <el-descriptions :column="2" size="small" border>
+                    <el-descriptions-item label="早餐">{{ item.breakfast || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="午餐">{{ item.lunch || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="晚餐">{{ item.dinner || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="住宿">{{ item.accommodation || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="交通">{{ item.transportation || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="活动安排" :span="2">
+                      <span style="white-space: pre-wrap;">{{ item.activities || '-' }}</span>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="备注" :span="2">
+                      <span style="white-space: pre-wrap; color: #e6a23c;">{{ item.notes || '-' }}</span>
+                    </el-descriptions-item>
+                  </el-descriptions>
+                </el-card>
+              </el-timeline-item>
+            </el-timeline>
+          </div>
+          <el-empty v-else description="暂无每日行程安排" />
+        </el-tab-pane>
+      </el-tabs>
       <template #footer>
         <div class="detail-footer-actions">
           <el-button
@@ -170,6 +209,8 @@ const filterStatus = ref('')
 
 const detailVisible = ref(false)
 const currentOrder = ref(null)
+const detailTab = ref('basic')
+const itineraries = ref([])
 
 const refundDialogVisible = ref(false)
 const currentRefundOrder = ref(null)
@@ -231,14 +272,24 @@ function formatDate(date) {
 }
 
 async function viewDetail(row) {
+  detailTab.value = 'basic'
+  itineraries.value = []
   try {
     const res = await getOrder(row.id)
     currentOrder.value = res.data
+    if (res.data.trip && res.data.trip.itineraries) {
+      itineraries.value = [...res.data.trip.itineraries].sort((a, b) => a.day_number - b.day_number)
+    }
     detailVisible.value = true
   } catch (e) {
     currentOrder.value = row
     detailVisible.value = true
   }
+}
+
+function getDayType(day) {
+  const types = ['primary', 'success', 'warning', 'danger', 'info']
+  return types[(day - 1) % types.length]
 }
 
 async function handlePay(row) {
@@ -288,3 +339,20 @@ async function submitRefund() {
 
 onMounted(loadOrders)
 </script>
+
+<style scoped>
+.order-detail-dialog :deep(.el-dialog__body) {
+  padding-top: 8px;
+}
+.itinerary-card {
+  margin-bottom: 4px;
+}
+.itinerary-card :deep(.el-descriptions__label) {
+  width: 70px;
+}
+.detail-footer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+</style>

@@ -341,13 +341,35 @@
       </div>
     </el-dialog>
 
-    <el-dialog v-model="bookDialogVisible" title="预订行程" width="500px">
+    <el-dialog v-model="bookDialogVisible" title="预订行程" width="520px">
       <el-form :model="bookForm" label-width="100px" ref="bookFormRef" :rules="bookRules">
         <el-form-item label="行程名称">
           <span style="color: #303133;">{{ currentTrip?.name }}</span>
         </el-form-item>
         <el-form-item label="行程价格">
           <span style="color: #f56c6c; font-weight: 600;">¥{{ currentTrip?.price }} /人</span>
+        </el-form-item>
+        <el-form-item label="预订方式">
+          <el-radio-group v-model="bookForm.bookMode">
+            <el-radio value="guest">
+              <el-icon><User /></el-icon>
+              <span>游客下单（无需登录）</span>
+            </el-radio>
+            <el-radio value="user">
+              <el-icon><Avatar /></el-icon>
+              <span>会员下单</span>
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="bookForm.bookMode === 'user'" label="选择用户" prop="userId">
+          <el-select v-model="bookForm.userId" placeholder="请选择会员用户" style="width: 100%;" filterable>
+            <el-option
+              v-for="user in userList"
+              :key="user.id"
+              :label="`${user.username}（${user.phone || user.email}）`"
+              :value="user.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="出行人数" prop="travelers">
           <el-input-number v-model="bookForm.travelers" :min="1" :max="currentTrip?.left_spots || 1" />
@@ -375,7 +397,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled, Search, Refresh, Plus, Picture, Location, Calendar, User, Edit, Document, View, Delete, ShoppingCart } from '@element-plus/icons-vue'
+import { MoreFilled, Search, Refresh, Plus, Picture, Location, Calendar, User, Edit, Document, View, Delete, ShoppingCart, Avatar } from '@element-plus/icons-vue'
 import {
   getTrips,
   getTrip,
@@ -390,6 +412,14 @@ import {
   getSpotLogs
 } from '@/api/trip'
 import { createOrder, payOrder } from '@/api/order'
+import request from '@/utils/request'
+
+function getUsers() {
+  return request({
+    url: '/users',
+    method: 'get'
+  })
+}
 
 const loading = ref(false)
 const trips = ref([])
@@ -465,7 +495,10 @@ const spotLogs = ref([])
 
 const bookDialogVisible = ref(false)
 const bookFormRef = ref(null)
+const userList = ref([])
 const bookForm = reactive({
+  bookMode: 'guest',
+  userId: null,
   travelers: 1,
   contactName: '',
   contactPhone: ''
@@ -474,7 +507,8 @@ const bookForm = reactive({
 const bookRules = {
   travelers: [{ required: true, message: '请选择出行人数', trigger: 'change' }],
   contactName: [{ required: true, message: '请输入联系人姓名', trigger: 'blur' }],
-  contactPhone: [{ required: true, message: '请输入联系电话', trigger: 'blur' }]
+  contactPhone: [{ required: true, message: '请输入联系电话', trigger: 'blur' }],
+  userId: [{ required: true, message: '请选择会员用户', trigger: 'change' }]
 }
 
 const filteredTrips = computed(() => {
@@ -753,11 +787,23 @@ function handleDetail(trip) {
   )
 }
 
+async function loadUserList() {
+  try {
+    const res = await getUsers()
+    userList.value = res.data || []
+  } catch (e) {
+    userList.value = []
+  }
+}
+
 function handleBook(trip) {
   currentTrip.value = trip
+  bookForm.bookMode = 'guest'
+  bookForm.userId = null
   bookForm.travelers = 1
   bookForm.contactName = ''
   bookForm.contactPhone = ''
+  loadUserList()
   bookDialogVisible.value = true
 }
 
@@ -765,10 +811,13 @@ async function submitBook() {
   if (!bookFormRef.value) return
   await bookFormRef.value.validate(async (valid) => {
     if (!valid) return
+    if (bookForm.bookMode === 'user' && !bookForm.userId) {
+      ElMessage.warning('请选择会员用户')
+      return
+    }
     submitting.value = true
     try {
       const orderData = {
-        user_id: 2,
         trip_id: currentTrip.value.id,
         trip_name: currentTrip.value.name,
         trip_price: currentTrip.value.price,
@@ -776,6 +825,9 @@ async function submitBook() {
         total_amount: bookForm.travelers * currentTrip.value.price,
         contact_name: bookForm.contactName,
         contact_phone: bookForm.contactPhone
+      }
+      if (bookForm.bookMode === 'user' && bookForm.userId) {
+        orderData.user_id = bookForm.userId
       }
       const res = await createOrder(orderData)
       bookDialogVisible.value = false

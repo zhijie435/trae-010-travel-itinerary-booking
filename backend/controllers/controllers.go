@@ -78,7 +78,7 @@ func GetOrders(c *gin.Context) {
 
 func GetOrder(c *gin.Context) {
 	var order models.Order
-	if err := config.DB.Preload("Trip").Preload("User").First(&order, c.Param("id")).Error; err != nil {
+	if err := config.DB.Preload("Trip").Preload("Trip.Itineraries").Preload("User").First(&order, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "订单不存在"})
 		return
 	}
