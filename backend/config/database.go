@@ -21,10 +21,9 @@ func InitDB() {
 		&models.User{},
 		&models.Route{},
 		&models.Itinerary{},
-		&models.TourGroup{},
-		&models.TourGroupAdjustLog{},
+		&models.Inventory{},
+		&models.InventoryAdjustLog{},
 		&models.Order{},
-		&models.Traveler{},
 		&models.RefundRequest{},
 		&models.RefundReviewLog{},
 	)
