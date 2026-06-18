@@ -1,0 +1,40 @@
+# Backend
+backend/travel.db
+backend/*.log
+
+# Go
+*.exe
+*.test
+*.out
+
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# IDE
+.idea
+.vscode
+*.swp
+.DS_Store
+node_modules/
+.next/
+dist/
+coverage/
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+.trae-worker-logs/
+.trae-codex-analysis/
+TRAE-CN-*-任务跟踪表.xlsx
+TRAE-CN-*-任务跟踪表*.xlsx
+.~*.xlsx
+~$*.xlsx
+*.xlsx.lock
+*.log
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
