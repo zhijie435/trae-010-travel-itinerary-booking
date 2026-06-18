@@ -24,10 +24,6 @@
           <el-icon><Tickets /></el-icon>
           <span>订单管理</span>
         </el-menu-item>
-        <el-menu-item index="/refunds">
-          <el-icon><Refund /></el-icon>
-          <span>退款管理</span>
-        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>

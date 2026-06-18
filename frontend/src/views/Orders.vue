@@ -48,27 +48,11 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="viewDetail(row)">
               <el-icon><View /></el-icon>
-              详情
-            </el-button>
-            <el-button
-              v-if="row.status === 'pending'"
-              type="success" link size="small"
-              @click="handlePay(row)"
-            >
-              <el-icon><Money /></el-icon>
-              支付
-            </el-button>
-            <el-button
-              v-if="row.status === 'paid' || row.status === 'confirmed'"
-              type="warning" link size="small"
-              @click="openRefundDialog(row)"
-            >
-              <el-icon><Refund /></el-icon>
-              申请退款
+              查看详情
             </el-button>
           </template>
         </el-table-column>
@@ -96,6 +80,27 @@
         <el-descriptions-item label="创建时间" :span="2">{{ formatDate(currentOrder.created_at) }}</el-descriptions-item>
         <el-descriptions-item label="支付时间" :span="2">{{ currentOrder.pay_time ? formatDate(currentOrder.pay_time) : '未支付' }}</el-descriptions-item>
       </el-descriptions>
+      <template #footer>
+        <div class="detail-footer-actions">
+          <el-button
+            v-if="currentOrder && currentOrder.status === 'pending'"
+            type="success"
+            @click="handlePay(currentOrder); detailVisible = false;"
+          >
+            <el-icon><Money /></el-icon>
+            <span>立即支付</span>
+          </el-button>
+          <el-button
+            v-if="currentOrder && (currentOrder.status === 'paid' || currentOrder.status === 'confirmed')"
+            type="warning"
+            @click="openRefundDialog(currentOrder); detailVisible = false;"
+          >
+            <el-icon><Refund /></el-icon>
+            <span>申请售后退款</span>
+          </el-button>
+          <el-button @click="detailVisible = false">关闭</el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <el-dialog v-model="refundDialogVisible" title="申请退款" width="520px">
