@@ -58,13 +58,65 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
+	if order.TripID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "行程ID不能为空"})
+		return
+	}
+
+	var trip models.Trip
+	if err := config.DB.First(&trip, order.TripID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "行程不存在"})
+		return
+	}
+
+	if trip.Status != "active" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "该行程不可预订"})
+		return
+	}
+
+	if order.Travelers <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "出行人数必须大于0"})
+		return
+	}
+
+	if trip.LeftSpots < order.Travelers {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "剩余名额不足"})
+		return
+	}
+
+	if order.ContactName == "" || order.ContactPhone == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "联系人和联系电话不能为空"})
+		return
+	}
+
+	if order.UserID != nil && *order.UserID == 0 {
+		order.UserID = nil
+	}
+
 	order.OrderNo = generateOrderNo()
 	order.Status = "pending"
+	order.TripName = trip.Name
+	order.TripPrice = trip.Price
 
-	if err := config.DB.Create(&order).Error; err != nil {
+	if order.TotalAmount <= 0 {
+		order.TotalAmount = trip.Price * float64(order.Travelers)
+	}
+
+	tx := config.DB.Begin()
+
+	if err := tx.Create(&order).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	if err := tx.Model(&trip).Update("left_spots", trip.LeftSpots-order.Travelers).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	tx.Commit()
 
 	c.JSON(http.StatusCreated, gin.H{"data": order})
 }
@@ -154,11 +206,13 @@ func CreateRefundRequest(c *gin.Context) {
 		RefundNo:     generateRefundNo(),
 		OrderID:      input.OrderID,
 		OrderNo:      order.OrderNo,
-		UserID:       order.UserID,
 		Reason:       input.Reason,
 		Description:  input.Description,
 		RefundAmount: refundAmount,
 		Status:       "pending",
+	}
+	if order.UserID != nil {
+		refundReq.UserID = order.UserID
 	}
 
 	if err := config.DB.Create(&refundReq).Error; err != nil {

@@ -30,7 +30,7 @@ type Trip struct {
 type Order struct {
 	gorm.Model
 	OrderNo     string    `json:"order_no" gorm:"uniqueIndex"`
-	UserID      uint      `json:"user_id"`
+	UserID      *uint     `json:"user_id"`
 	TripID      uint      `json:"trip_id"`
 	TripName    string    `json:"trip_name"`
 	TripPrice   float64   `json:"trip_price"`
@@ -41,7 +41,7 @@ type Order struct {
 	Status      string    `json:"status"`
 	PayTime     *time.Time `json:"pay_time"`
 	Trip        Trip      `json:"trip" gorm:"foreignKey:TripID"`
-	User        User      `json:"user" gorm:"foreignKey:UserID"`
+	User        *User     `json:"user" gorm:"foreignKey:UserID"`
 }
 
 type RefundRequest struct {
@@ -49,7 +49,7 @@ type RefundRequest struct {
 	RefundNo     string    `json:"refund_no" gorm:"uniqueIndex"`
 	OrderID      uint      `json:"order_id"`
 	OrderNo      string    `json:"order_no"`
-	UserID       uint      `json:"user_id"`
+	UserID       *uint     `json:"user_id"`
 	Reason       string    `json:"reason"`
 	Description  string    `json:"description"`
 	RefundAmount float64   `json:"refund_amount"`
@@ -58,5 +58,5 @@ type RefundRequest struct {
 	ReviewRemark string    `json:"review_remark"`
 	ReviewTime   *time.Time `json:"review_time"`
 	Order        Order     `json:"order" gorm:"foreignKey:OrderID"`
-	User         User      `json:"user" gorm:"foreignKey:UserID"`
+	User         *User     `json:"user" gorm:"foreignKey:UserID"`
 }
