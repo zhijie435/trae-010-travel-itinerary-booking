@@ -35,6 +35,7 @@ func SetupRouter() *gin.Engine {
 		{
 			refunds.GET("", controllers.GetRefundRequests)
 			refunds.GET("/:id", controllers.GetRefundRequest)
+			refunds.GET("/:id/review-logs", controllers.GetRefundReviewLogs)
 			refunds.POST("", controllers.CreateRefundRequest)
 			refunds.POST("/:id/review", controllers.ReviewRefundRequest)
 			refunds.POST("/batch-review", controllers.BatchReviewRefundRequests)

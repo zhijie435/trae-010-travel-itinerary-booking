@@ -82,11 +82,15 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="viewDetail(row)">
               <el-icon><View /></el-icon>
               详情
+            </el-button>
+            <el-button type="info" link size="small" @click="openReviewLogsDialog(row)">
+              <el-icon><Clock /></el-icon>
+              审核记录
             </el-button>
             <el-button
               v-if="row.status === 'pending'"
@@ -143,6 +147,39 @@
           </el-descriptions-item>
         </template>
       </el-descriptions>
+
+      <div v-if="currentRefund" style="margin-top: 16px;">
+        <el-divider style="margin: 0 0 16px;" />
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <el-icon><Clock /></el-icon>
+          <span style="font-weight: 600;">审核记录</span>
+          <el-tag size="small" type="info" effect="plain">{{ currentRefund.review_logs?.length || 0 }} 条</el-tag>
+        </div>
+        <el-timeline v-if="currentRefund.review_logs?.length">
+          <el-timeline-item
+            v-for="log in currentRefund.review_logs"
+            :key="log.id"
+            :timestamp="formatDate(log.created_at)"
+            placement="top"
+            :type="actionType(log.action)"
+          >
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <el-tag :type="actionType(log.action)" effect="light" size="small">{{ actionText(log.action) }}</el-tag>
+              <span style="color: #909399; font-size: 13px;">操作人：{{ operatorName(log) }}</span>
+            </div>
+            <div style="color: #606266; font-size: 13px;">
+              状态变更：
+              <el-tag size="small" type="info" effect="plain">{{ statusText(log.from_status) || '—' }}</el-tag>
+              <el-icon style="margin: 0 4px; vertical-align: middle;"><ArrowRight /></el-icon>
+              <el-tag size="small" :type="statusType(log.to_status)" effect="light">{{ statusText(log.to_status) }}</el-tag>
+            </div>
+            <div v-if="log.remark" style="color: #909399; font-size: 13px; margin-top: 4px;">
+              备注：{{ log.remark }}
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+        <el-empty v-else description="暂无审核记录" :image-size="60" />
+      </div>
     </el-dialog>
 
     <el-dialog v-model="reviewVisible" :title="reviewTitle" width="500px">
@@ -227,13 +264,56 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="reviewLogsVisible" title="审核记录" width="600px">
+      <div v-loading="reviewLogsLoading">
+        <el-descriptions :column="1" border v-if="currentLogsRefund" style="margin-bottom: 16px;">
+          <el-descriptions-item label="退款编号">{{ currentLogsRefund.refund_no }}</el-descriptions-item>
+          <el-descriptions-item label="关联订单">
+            {{ currentLogsRefund.order_no }}
+            <span style="margin-left: 8px; color: #909399;">{{ currentLogsRefund.order?.trip_name || '-' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="当前状态">
+            <el-tag :type="statusType(currentLogsRefund.status)" effect="light">{{ statusText(currentLogsRefund.status) }}</el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <el-timeline v-if="reviewLogs.length">
+          <el-timeline-item
+            v-for="log in reviewLogs"
+            :key="log.id"
+            :timestamp="formatDate(log.created_at)"
+            placement="top"
+            :type="actionType(log.action)"
+          >
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <el-tag :type="actionType(log.action)" effect="light" size="small">{{ actionText(log.action) }}</el-tag>
+              <span style="color: #909399; font-size: 13px;">操作人：{{ operatorName(log) }}</span>
+            </div>
+            <div style="color: #606266; font-size: 13px;">
+              状态变更：
+              <el-tag size="small" type="info" effect="plain">{{ statusText(log.from_status) || '—' }}</el-tag>
+              <el-icon style="margin: 0 4px; vertical-align: middle;"><ArrowRight /></el-icon>
+              <el-tag size="small" :type="statusType(log.to_status)" effect="light">{{ statusText(log.to_status) }}</el-tag>
+            </div>
+            <div v-if="log.remark" style="color: #909399; font-size: 13px; margin-top: 4px;">
+              备注：{{ log.remark }}
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+        <el-empty v-else description="暂无审核记录" />
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="reviewLogsVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getRefundRequests, getRefundRequest, reviewRefundRequest, batchReviewRefundRequests } from '@/api/refund'
+import { getRefundRequests, getRefundRequest, getRefundReviewLogs, reviewRefundRequest, batchReviewRefundRequests } from '@/api/refund'
 
 const loading = ref(false)
 const refunds = ref([])
@@ -253,6 +333,11 @@ const reviewForm = reactive({
 
 const batchReviewVisible = ref(false)
 const batchReviewType = ref('')
+
+const reviewLogsVisible = ref(false)
+const reviewLogsLoading = ref(false)
+const reviewLogs = ref([])
+const currentLogsRefund = ref(null)
 
 const reviewTitle = computed(() => {
   return reviewType.value === 'approved' ? '审核通过' : '审核拒绝'
@@ -319,6 +404,33 @@ function reasonText(reason) {
   return map[reason] || reason || '-'
 }
 
+function actionText(action) {
+  const map = {
+    submitted: '提交申请',
+    approved: '审核通过',
+    rejected: '审核拒绝'
+  }
+  return map[action] || action
+}
+
+function actionType(action) {
+  const map = {
+    submitted: 'primary',
+    approved: 'success',
+    rejected: 'danger'
+  }
+  return map[action] || 'info'
+}
+
+function operatorName(log) {
+  if (log.operator?.username) {
+    const role = log.operator.role === 'admin' ? '管理员' : '用户'
+    return `${role}（${log.operator.username}）`
+  }
+  if (log.action === 'submitted') return '游客用户'
+  return '管理员'
+}
+
 function formatDate(date) {
   if (!date) return '-'
   return new Date(date).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-')
@@ -332,6 +444,19 @@ async function viewDetail(row) {
     currentRefund.value = row
   }
   detailVisible.value = true
+}
+
+async function openReviewLogsDialog(row) {
+  currentLogsRefund.value = row
+  reviewLogs.value = []
+  reviewLogsVisible.value = true
+  reviewLogsLoading.value = true
+  try {
+    const res = await getRefundReviewLogs(row.id)
+    reviewLogs.value = res.data || []
+  } finally {
+    reviewLogsLoading.value = false
+  }
 }
 
 function openReviewDialog(row, type) {

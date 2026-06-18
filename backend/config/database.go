@@ -22,6 +22,7 @@ func InitDB() {
 		&models.Trip{},
 		&models.Order{},
 		&models.RefundRequest{},
+		&models.RefundReviewLog{},
 		&models.TripItinerary{},
 		&models.SpotAdjustmentLog{},
 	)

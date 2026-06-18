@@ -15,6 +15,13 @@ export function getRefundRequest(id) {
   })
 }
 
+export function getRefundReviewLogs(id) {
+  return request({
+    url: `/refunds/${id}/review-logs`,
+    method: 'get'
+  })
+}
+
 export function createRefundRequest(data) {
   return request({
     url: '/refunds',

@@ -199,11 +199,23 @@ func GetRefundRequests(c *gin.Context) {
 
 func GetRefundRequest(c *gin.Context) {
 	var req models.RefundRequest
-	if err := config.DB.Preload("Order").Preload("Order.Trip").Preload("User").First(&req, c.Param("id")).Error; err != nil {
+	if err := config.DB.Preload("Order").Preload("Order.Trip").Preload("User").
+		Preload("ReviewLogs").Preload("ReviewLogs.Operator").
+		First(&req, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "退款申请不存在"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": req})
+}
+
+func GetRefundReviewLogs(c *gin.Context) {
+	refundID := c.Param("id")
+	var logs []models.RefundReviewLog
+	if err := config.DB.Preload("Operator").Where("refund_id = ?", refundID).Order("created_at ASC").Find(&logs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": logs})
 }
 
 func CreateRefundRequest(c *gin.Context) {
@@ -254,6 +266,16 @@ func CreateRefundRequest(c *gin.Context) {
 		return
 	}
 
+	submitLog := models.RefundReviewLog{
+		RefundID:   refundReq.ID,
+		Action:     "submitted",
+		FromStatus: "",
+		ToStatus:   "pending",
+		Remark:     refundReq.Description,
+		OperatorID: refundReq.UserID,
+	}
+	config.DB.Create(&submitLog)
+
 	order.Status = "refunding"
 	config.DB.Save(&order)
 
@@ -298,6 +320,20 @@ func ReviewRefundRequest(c *gin.Context) {
 	req.ReviewTime = &now
 	req.ReviewerID = &reviewerID
 	if err := tx.Save(&req).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	reviewLog := models.RefundReviewLog{
+		RefundID:   req.ID,
+		Action:     input.Status,
+		FromStatus: "pending",
+		ToStatus:   input.Status,
+		Remark:     input.ReviewRemark,
+		OperatorID: &reviewerID,
+	}
+	if err := tx.Create(&reviewLog).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -386,6 +422,16 @@ func BatchReviewRefundRequests(c *gin.Context) {
 		if err := tx.Save(&req).Error; err != nil {
 			continue
 		}
+
+		batchLog := models.RefundReviewLog{
+			RefundID:   req.ID,
+			Action:     input.Status,
+			FromStatus: "pending",
+			ToStatus:   input.Status,
+			Remark:     input.ReviewRemark,
+			OperatorID: &reviewerID,
+		}
+		tx.Create(&batchLog)
 
 		var order models.Order
 		if err := tx.Preload("Trip").First(&order, req.OrderID).Error; err != nil {

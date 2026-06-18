@@ -60,6 +60,19 @@ type RefundRequest struct {
 	ReviewTime   *time.Time `json:"review_time"`
 	Order        Order     `json:"order" gorm:"foreignKey:OrderID"`
 	User         *User     `json:"user" gorm:"foreignKey:UserID"`
+	ReviewLogs   []RefundReviewLog `json:"review_logs,omitempty" gorm:"foreignKey:RefundID"`
+}
+
+type RefundReviewLog struct {
+	gorm.Model
+	RefundID   uint   `json:"refund_id"`
+	Action     string `json:"action"`
+	FromStatus string `json:"from_status"`
+	ToStatus   string `json:"to_status"`
+	Remark     string `json:"remark"`
+	OperatorID *uint  `json:"operator_id"`
+	Refund     RefundRequest `json:"-" gorm:"foreignKey:RefundID"`
+	Operator   *User  `json:"operator" gorm:"foreignKey:OperatorID"`
 }
 
 type TripItinerary struct {
