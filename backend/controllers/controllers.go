@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 	"travel-refund/config"
 	"travel-refund/models"
 
@@ -57,6 +58,8 @@ type BatchReviewInput struct {
 func GetOrders(c *gin.Context) {
 	userID := c.Query("user_id")
 	status := c.Query("status")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 
 	var orders []models.Order
 	query := config.DB.Preload("Trip")
@@ -66,6 +69,17 @@ func GetOrders(c *gin.Context) {
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if startDate != "" {
+		if t, err := parseDate(startDate); err == nil {
+			query = query.Where("created_at >= ?", t)
+		}
+	}
+	if endDate != "" {
+		if t, err := parseDate(endDate); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Second)
+			query = query.Where("created_at <= ?", endOfDay)
+		}
 	}
 
 	if err := query.Order("created_at DESC").Find(&orders).Error; err != nil {
@@ -481,8 +495,25 @@ func BatchReviewRefundRequests(c *gin.Context) {
 }
 
 func GetTrips(c *gin.Context) {
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
 	var trips []models.Trip
-	if err := config.DB.Order("created_at DESC").Find(&trips).Error; err != nil {
+	query := config.DB.Order("created_at DESC")
+
+	if startDate != "" {
+		if t, err := parseDate(startDate); err == nil {
+			query = query.Where("end_date >= ?", t)
+		}
+	}
+	if endDate != "" {
+		if t, err := parseDate(endDate); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Second)
+			query = query.Where("start_date <= ?", endOfDay)
+		}
+	}
+
+	if err := query.Find(&trips).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

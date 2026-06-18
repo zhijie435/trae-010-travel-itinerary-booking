@@ -27,7 +27,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-label">订单金额</div>
-              <div class="stat-value">¥{{ stats.totalAmount.toLocaleString() }}</div>
+              <div class="stat-value">¥{{ stats.totalAmount.toFixed(2) }}</div>
             </div>
           </div>
         </el-card>
@@ -150,8 +150,10 @@ async function loadStats() {
     const orders = ordersRes.data || []
     const refunds = refundsRes.data || []
 
+    const validStatuses = ['paid', 'confirmed', 'completed', 'refunding']
+    const validOrders = orders.filter(o => validStatuses.includes(o.status))
     stats.totalOrders = orders.length
-    stats.totalAmount = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0)
+    stats.totalAmount = validOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0)
     stats.totalRefunds = refunds.length
     stats.pendingRefunds = refunds.filter(r => r.status === 'pending').length
 

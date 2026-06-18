@@ -1,9 +1,10 @@
 import request from '../utils/request'
 
-export function getTrips() {
+export function getTrips(params) {
   return request({
     url: '/trips',
-    method: 'get'
+    method: 'get',
+    params
   })
 }
 

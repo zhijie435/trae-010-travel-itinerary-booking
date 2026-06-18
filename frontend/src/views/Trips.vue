@@ -8,6 +8,15 @@
     <div class="card-content">
       <div class="toolbar">
         <div class="search-filters">
+          <el-date-picker
+            v-model="filterDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="出发日期"
+            end-placeholder="返程日期"
+            value-format="YYYY-MM-DD"
+            style="width: 280px;"
+          />
           <el-input v-model="searchKeyword" placeholder="搜索行程名称/目的地" clearable style="width: 240px;" />
           <el-button type="primary" @click="loadTrips">
             <el-icon><Search /></el-icon>
@@ -424,6 +433,7 @@ function getUsers() {
 const loading = ref(false)
 const trips = ref([])
 const searchKeyword = ref('')
+const filterDateRange = ref([])
 
 const tripDialogVisible = ref(false)
 const isEdit = ref(false)
@@ -523,7 +533,12 @@ const filteredTrips = computed(() => {
 async function loadTrips() {
   loading.value = true
   try {
-    const res = await getTrips()
+    const params = {}
+    if (filterDateRange.value && filterDateRange.value.length === 2) {
+      params.start_date = filterDateRange.value[0]
+      params.end_date = filterDateRange.value[1]
+    }
+    const res = await getTrips(params)
     trips.value = res.data || []
   } finally {
     loading.value = false

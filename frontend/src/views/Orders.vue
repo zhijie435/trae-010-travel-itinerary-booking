@@ -8,6 +8,15 @@
     <div class="card-content">
       <div class="toolbar">
         <div class="search-filters">
+          <el-date-picker
+            v-model="filterDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 280px;"
+          />
           <el-select v-model="filterStatus" placeholder="订单状态" clearable style="width: 160px;">
             <el-option label="待支付" value="pending" />
             <el-option label="已支付" value="paid" />
@@ -206,6 +215,7 @@ import { createRefundRequest } from '@/api/refund'
 const loading = ref(false)
 const orders = ref([])
 const filterStatus = ref('')
+const filterDateRange = ref([])
 
 const detailVisible = ref(false)
 const currentOrder = ref(null)
@@ -233,6 +243,10 @@ async function loadOrders() {
   try {
     const params = {}
     if (filterStatus.value) params.status = filterStatus.value
+    if (filterDateRange.value && filterDateRange.value.length === 2) {
+      params.start_date = filterDateRange.value[0]
+      params.end_date = filterDateRange.value[1]
+    }
     const res = await getOrders(params)
     orders.value = res.data || []
   } finally {
