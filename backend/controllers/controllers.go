@@ -145,10 +145,7 @@ func CreateOrder(c *gin.Context) {
 	order.Status = "pending"
 	order.TripName = trip.Name
 	order.TripPrice = trip.Price
-
-	if order.TotalAmount <= 0 {
-		order.TotalAmount = trip.Price * float64(order.Travelers)
-	}
+	order.TotalAmount = trip.Price * float64(order.Travelers)
 
 	tx := config.DB.Begin()
 
